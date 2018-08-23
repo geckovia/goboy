@@ -42,6 +42,43 @@ func (c *CPU) DE() uint16 {
 	return (uint16(c.D) << 8) + uint16(c.E)
 }
 
+// Z flag
+func (c *CPU) Z() bool {
+	return (c.F & 0x80) == 0x80
+}
+
+// N flag
+func (c *CPU) N() bool {
+	return (c.F & 0x40) == 0x40
+}
+
+// Hy flag
+func (c *CPU) Hy() bool {
+	return (c.F & 0x20) == 0x20
+}
+
+// Cy flag
+func (c *CPU) Cy() bool {
+	return (c.F & 0x10) == 0x10
+}
+
+func (c *CPU) setFlags(z bool, n bool, h bool, cy bool) {
+	var value byte = 0
+	if z {
+		value += 0x80
+	}
+	if n {
+		value += 0x40
+	}
+	if h {
+		value += 0x20
+	}
+	if cy {
+		value += 0x10
+	}
+	c.F = value
+}
+
 func (c *CPU) load8(address uint16) byte {
 	value := c.mem.Read(address)
 	c.tick()
@@ -141,6 +178,8 @@ func (c *CPU) processOpcode() {
 
 	// Other opcodes
 	switch opcode {
+	case 0: // NOP
+		return
 	case 0x06: // LD B, n
 		c.B = c.load8PC()
 	case 0x0e: // LD C, n
