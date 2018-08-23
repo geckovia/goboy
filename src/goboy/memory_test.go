@@ -27,6 +27,7 @@ func TestRomLoading(t *testing.T) {
 		data[i] = byte(i/1000 + 1)
 	}
 	m.LoadRom(&data)
+	m.bootDisabled = true
 	m.Assert(0, 1, t)
 	m.Assert(0x3fff, 17, t)
 	m.Assert(0x4000, 17, t)
@@ -52,6 +53,7 @@ func TestMBC1ChangeROM(t *testing.T) {
 	}
 	data[0x147] = 1 // MBC1
 	m.LoadRom(&data)
+	m.bootDisabled = true
 	m.Assert(0, 1, t)
 	m.Assert(0x4000, 17, t)
 	m.Write(0x2000, 3) // Change to ROM bank 3
