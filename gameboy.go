@@ -14,7 +14,7 @@ func NewGameBoy(rom *[]byte) gameBoy {
 	gb.CPU = &c
 
 	mem := memory{}
-	mem.LoadRom(rom)
+	mem.loadRom(rom)
 	c.mem = &mem
 	gb.Memory = &mem
 

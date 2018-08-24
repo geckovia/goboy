@@ -1,11 +1,13 @@
 package goboy
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestBoot(t *testing.T) {
 	mem := memory{}
 	data := make([]byte, 0x4000)
-	mem.LoadRom(&data)
+	mem.loadRom(&data)
 	processor := cpu{}
 	processor.mem = &mem
 
