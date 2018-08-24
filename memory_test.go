@@ -3,7 +3,7 @@ package goboy
 import "testing"
 
 // A Helper to check memory
-func (m *Memory) Assert(address uint16, value byte, t *testing.T) {
+func (m *memory) Assert(address uint16, value byte, t *testing.T) {
 	result := m.Read(address)
 	if result != value {
 		t.Error("Expected", value, "got", result)
@@ -12,7 +12,7 @@ func (m *Memory) Assert(address uint16, value byte, t *testing.T) {
 
 // Test that we can write and read a simple byte in memory
 func TestSimpleWrite(t *testing.T) {
-	m := Memory{}
+	m := memory{}
 	m.Assert(0xc100, 0, t)
 	m.Write(0xc100, 42)
 	m.Assert(0xc100, 42, t)
@@ -20,7 +20,7 @@ func TestSimpleWrite(t *testing.T) {
 
 // Test a ROM loading
 func TestRomLoading(t *testing.T) {
-	m := Memory{}
+	m := memory{}
 	m.Write(0xc100, 42)
 	data := make([]byte, 100000)
 	for i := 0; i < 100000; i++ {
@@ -36,7 +36,7 @@ func TestRomLoading(t *testing.T) {
 
 // Test Echo memory segment
 func TestEchoMemory(t *testing.T) {
-	m := Memory{}
+	m := memory{}
 	m.Write(0xc000, 42)
 	m.Write(0xe001, 69)
 	m.Assert(0xc000, 42, t)
@@ -46,7 +46,7 @@ func TestEchoMemory(t *testing.T) {
 }
 
 func TestMBC1ChangeROM(t *testing.T) {
-	m := Memory{}
+	m := memory{}
 	data := make([]byte, 100000)
 	for i := 0; i < 100000; i++ {
 		data[i] = byte(i/1024 + 1)

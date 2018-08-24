@@ -2,9 +2,9 @@ package goboy
 
 import "strconv"
 
-// CPU emulates the DMG micro-controller
-type CPU struct {
-	mem *Memory // A pointer to the memory system
+// cpu emulates the DMG micro-controller
+type cpu struct {
+	mem *memory // A pointer to the memory system
 	A   byte
 	B   byte
 	C   byte
@@ -18,52 +18,52 @@ type CPU struct {
 }
 
 // Emulates a CPU clock cycle
-func (c *CPU) tick() {
+func (c *cpu) tick() {
 	// TODO when a clock will be implemented
 }
 
 // HL register
-func (c *CPU) HL() uint16 {
+func (c *cpu) HL() uint16 {
 	return (uint16(c.H) << 8) + uint16(c.L)
 }
 
 // AF register
-func (c *CPU) AF() uint16 {
+func (c *cpu) AF() uint16 {
 	return (uint16(c.A) << 8) + uint16(c.F)
 }
 
 // BC register
-func (c *CPU) BC() uint16 {
+func (c *cpu) BC() uint16 {
 	return (uint16(c.B) << 8) + uint16(c.C)
 }
 
 // DE register
-func (c *CPU) DE() uint16 {
+func (c *cpu) DE() uint16 {
 	return (uint16(c.D) << 8) + uint16(c.E)
 }
 
 // Z flag
-func (c *CPU) Z() bool {
+func (c *cpu) Z() bool {
 	return (c.F & 0x80) == 0x80
 }
 
 // N flag
-func (c *CPU) N() bool {
+func (c *cpu) N() bool {
 	return (c.F & 0x40) == 0x40
 }
 
 // Hy flag
-func (c *CPU) Hy() bool {
+func (c *cpu) Hy() bool {
 	return (c.F & 0x20) == 0x20
 }
 
 // Cy flag
-func (c *CPU) Cy() bool {
+func (c *cpu) Cy() bool {
 	return (c.F & 0x10) == 0x10
 }
 
-func (c *CPU) setFlags(z bool, n bool, h bool, cy bool) {
-	var value byte = 0
+func (c *cpu) setFlags(z bool, n bool, h bool, cy bool) {
+	var value byte
 	if z {
 		value += 0x80
 	}
@@ -79,31 +79,31 @@ func (c *CPU) setFlags(z bool, n bool, h bool, cy bool) {
 	c.F = value
 }
 
-func (c *CPU) load8(address uint16) byte {
+func (c *cpu) load8(address uint16) byte {
 	value := c.mem.Read(address)
 	c.tick()
 	return value
 }
 
-func (c *CPU) load8PC() byte {
+func (c *cpu) load8PC() byte {
 	value := c.load8(c.PC)
 	c.PC++
 	return value
 }
 
-func (c *CPU) load16(address uint16) uint16 {
+func (c *cpu) load16(address uint16) uint16 {
 	high := c.load8(address)
 	low := c.load8(address + 1)
 	return uint16(high)*0x100 + uint16(low)
 }
 
-func (c *CPU) load16PC() uint16 {
+func (c *cpu) load16PC() uint16 {
 	value := c.load16(c.PC)
 	c.PC = c.PC + 2
 	return value
 }
 
-func (c *CPU) write8(address uint16, value byte) {
+func (c *cpu) write8(address uint16, value byte) {
 	c.mem.Write(address, value)
 	c.tick()
 }
@@ -111,7 +111,7 @@ func (c *CPU) write8(address uint16, value byte) {
 // Helper that store a value in a register designed by its rank.
 // (from 0 to 7) B C D E H L HL A
 // Most of the time, the value will be a byte, but we need int for the generic case
-func (c *CPU) seti(register int, value int) {
+func (c *cpu) seti(register int, value int) {
 	switch register {
 	case 0:
 		c.B = byte(value)
@@ -136,7 +136,7 @@ func (c *CPU) seti(register int, value int) {
 
 // Helper that load a common value specified by its rank.
 // (from 0 to 7) B C D E H L (HL) A
-func (c *CPU) geti(register int) int {
+func (c *cpu) geti(register int) int {
 	switch register {
 	case 0:
 		return int(c.B)
@@ -159,7 +159,7 @@ func (c *CPU) geti(register int) int {
 	}
 }
 
-func (c *CPU) processOpcode() {
+func (c *cpu) processOpcode() {
 	opcode := c.load8PC()
 
 	// HALT (must be done before the LD group)
@@ -194,15 +194,7 @@ func (c *CPU) processOpcode() {
 		c.L = c.load8PC()
 	case 0x31: // LD SP, nn
 		c.SP = c.load16PC()
-	case 0x76: // HALT
-		return // TODO
 	default:
 		panic("Unknown opcode 0x" + strconv.FormatInt(int64(opcode), 16))
-	}
-}
-
-func (c *CPU) run() {
-	for {
-		c.processOpcode()
 	}
 }

@@ -3,11 +3,13 @@ package goboy
 import "testing"
 
 func TestBoot(t *testing.T) {
-	mem := Memory{}
+	mem := memory{}
 	data := make([]byte, 0x4000)
 	mem.LoadRom(&data)
-	cpu := CPU{}
-	cpu.mem = &mem
+	processor := cpu{}
+	processor.mem = &mem
 
-	cpu.run()
+	for processor.PC != 0xe0 {
+		processor.processOpcode()
+	}
 }

@@ -1,7 +1,7 @@
 package goboy
 
-// Memory represents the address space the CPU/PPU can use to access data
-type Memory struct {
+// memory represents the address space the CPU/PPU can use to access data
+type memory struct {
 	mem          [0xffff]byte // TODO: optimize space, just because we could
 	mbc          MBC
 	bootDisabled bool
@@ -26,7 +26,7 @@ var bootROM = [256]byte{
 	0xf5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xfb, 0x86, 0x20, 0xfe, 0x3e, 0x01, 0xe0, 0x50}
 
 // LoadRom loads the content of a cartdridge in memory
-func (m *Memory) LoadRom(rom *[]byte) {
+func (m *memory) LoadRom(rom *[]byte) {
 	switch (*rom)[0x147] {
 	case 0:
 		m.mbc = loadMBC0(rom)
@@ -37,7 +37,7 @@ func (m *Memory) LoadRom(rom *[]byte) {
 	}
 }
 
-func (m *Memory) Read(address uint16) byte {
+func (m *memory) Read(address uint16) byte {
 	switch {
 	case 0xa000 <= address && address < 0xc000: // 8kB Switchable RAM bank
 		return m.mbc.read(address)
@@ -53,7 +53,7 @@ func (m *Memory) Read(address uint16) byte {
 	}
 }
 
-func (m *Memory) Write(address uint16, value byte) {
+func (m *memory) Write(address uint16, value byte) {
 	switch {
 	case 0xe000 <= address && address < 0xfe00: // Echo of 8kB Internal RAM
 		m.mem[address] = value
