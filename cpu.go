@@ -287,7 +287,7 @@ func (c *cpu) set(n uint, register int) {
 	case 5:
 		c.L = c.L | (1 << n)
 	case 6:
-		c.setHL(c.HL() | (1 << n))
+		c.write8(c.HL(), c.load8(c.HL())|(1<<n))
 	case 7:
 		c.A = c.A | (1 << n)
 	default:
@@ -310,7 +310,7 @@ func (c *cpu) res(n uint, register int) {
 	case 5:
 		c.L = c.L &^ (1 << n)
 	case 6:
-		c.setHL(c.HL() &^ (1 << n))
+		c.write8(c.HL(), c.load8(c.HL())&^(1<<n))
 	case 7:
 		c.A = c.A &^ (1 << n)
 	default:
