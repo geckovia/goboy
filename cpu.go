@@ -131,9 +131,35 @@ func (c *cpu) write8(address uint16, value byte) {
 	c.tick()
 }
 
+func (c *cpu) write16(address uint16, value uint16) {
+	c.write8(address, byte(value))
+	c.write8(address+1, byte(value>>8))
+}
+
 func (c *cpu) jump(address uint16) {
 	c.tick()
 	c.PC = address
+}
+
+func (c *cpu) push(value uint16) {
+	c.SP -= 2
+	c.write16(c.SP, value)
+	c.tick() // I don't understand why pushes takes 4 cycles more than a pop...
+}
+
+func (c *cpu) pop() uint16 {
+	value := c.load16(c.SP)
+	c.SP += 2
+	return value
+}
+
+func (c *cpu) call(address uint16) {
+	c.push(c.PC)
+	c.PC = address // call is 24 cycles, so by using a push we can't also use a jump
+}
+
+func (c *cpu) ret() {
+	c.jump(c.pop())
 }
 
 // Helper that store a value in a register designed by its rank.
@@ -400,16 +426,35 @@ func (c *cpu) processOpcode() {
 		c.setHL(hl - 1)
 	case 0x3e: // LD A, n
 		c.A = c.load8PC()
+	case 0xc1: // POP BC
+		c.setBC(c.pop())
+	case 0xc5: // PUSH BC
+		c.push(c.BC())
 	case 0xcb: // CB prefix
 		c.cb()
+	case 0xcd: // CALL nn
+		destination := c.load16PC()
+		c.call(destination)
+	case 0xd1: // POP DE
+		c.setDE(c.pop())
+	case 0xd5: // PUSH DE
+		c.push(c.DE())
 	case 0xe0: // LDH n A
 		c.write8(0xff00+uint16(c.load8PC()), c.A)
+	case 0xe1: // POP HL
+		c.setHL(c.pop())
 	case 0xe2: // LD (C) A
 		c.write8(0xff00+uint16(c.C), c.A)
+	case 0xe5: // PUSH HL
+		c.push(c.HL())
 	case 0xf0: // LDH A n
 		c.A = c.load8(0xff00 + uint16(c.load8PC()))
+	case 0xf1: // POP AF
+		c.setAF(c.pop())
 	case 0xf2: // LD A (C)
 		c.A = c.load8(0xff00 + uint16(c.C))
+	case 0xf5: // PUSH AF
+		c.push(c.AF())
 	default:
 		panic("Unknown opcode 0x" + strconv.FormatInt(int64(opcode), 16))
 	}
