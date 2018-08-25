@@ -225,7 +225,7 @@ func add(c *cpu, value int) int {
 	sum := a + value
 	carry := sum > 0xff
 	halfCarry := (a&0xf)+(value&0xf) > 0xf
-	c.setFlags(sum == 0, false, halfCarry, carry)
+	c.setFlags(byte(sum) == 0, false, halfCarry, carry)
 	return sum
 }
 
@@ -241,7 +241,7 @@ func sub(c *cpu, value int) int {
 	diff := a - value
 	carry := diff < 0
 	halfCarry := (a&0xf)-(value&0xf) < 0
-	c.setFlags(diff == 0, true, halfCarry, carry)
+	c.setFlags(byte(diff) == 0, true, halfCarry, carry)
 	return diff
 }
 
@@ -253,21 +253,21 @@ func sbc(c *cpu, value int) int {
 }
 
 func and(c *cpu, value int) int {
-	result := int(c.A & byte(value))
+	result := c.A & byte(value)
 	c.setFlags(result == 0, false, true, false)
-	return result
+	return int(result)
 }
 
 func or(c *cpu, value int) int {
-	result := int(c.A | byte(value))
+	result := c.A | byte(value)
 	c.setFlags(result == 0, false, false, false)
-	return result
+	return int(result)
 }
 
 func xor(c *cpu, value int) int {
-	result := int(c.A ^ byte(value))
+	result := c.A ^ byte(value)
 	c.setFlags(c.A == 0, false, false, false)
-	return result
+	return int(result)
 }
 
 func cp(c *cpu, value int) int {
@@ -303,7 +303,79 @@ func rlc(c *cpu, value int) int {
 	return int(result)
 }
 
+func rrc(c *cpu, value int) int {
+	carry := byte(value) & 1
+	result := byte(value) >> 1
+	result += carry << 7
+	c.setFlags(result == 0, false, false, carry == 1)
+	return int(result)
+}
+
+func rl(c *cpu, value int) int {
+	carry := byte(value) >> 7
+	result := byte(value) << 1
+	if c.Cy() {
+		result++
+	}
+	c.setFlags(result == 0, false, false, carry == 1)
+	return int(result)
+}
+
+func rr(c *cpu, value int) int {
+	carry := byte(value) & 1
+	result := byte(value) >> 1
+	if c.Cy() {
+		result += 0x80
+	}
+	c.setFlags(result == 0, false, false, carry == 1)
+	return int(result)
+}
+
+func sla(c *cpu, value int) int {
+	carry := byte(value) >> 7
+	result := byte(value) << 1
+	c.setFlags(result == 0, false, false, carry == 1)
+	return int(result)
+}
+
+func sra(c *cpu, value int) int {
+	carry := byte(value) & 1
+	msb := byte(value) & 0x80
+	result := (byte(value) >> 1) + msb
+	c.setFlags(result == 0, false, false, carry == 1)
+	return int(result)
+}
+
+func srl(c *cpu, value int) int {
+	carry := byte(value) & 1
+	result := byte(value) >> 1
+	c.setFlags(result == 0, false, false, carry == 1)
+	return int(result)
+}
+
+func swap(c *cpu, value int) int {
+	v := byte(value)
+	result := (v&0xf0)<<4 + (v&0x0f)>>4
+	c.setFlags(result == 0, false, false, false)
+	return int(result)
+}
+
+func inc(c *cpu, value int) int {
+	v := value + 1
+	halfCarry := (v&0xf)+(value&0xf) > 0xf
+	c.setFlags(byte(v) == 0, false, halfCarry, c.Cy())
+	return v
+}
+
+func dec(c *cpu, value int) int {
+	v := value - 1
+	halfCarry := (v&0xf)-(value&0xf) < 0
+	c.setFlags(byte(v) == 0, true, halfCarry, c.Cy())
+	return v
+}
+
 var arithmeticOps = []registerOperation{add, addc, sub, sbc, and, xor, or, cp}
+var cbOps = []registerOperation{rlc, rrc, rl, rr, sla, sra, swap, srl}
 
 // processCode emulates the fetching and processing
 // of an instruction by the CPU
@@ -340,20 +412,28 @@ func (c *cpu) processOpcode() {
 		c.setBC(c.load16PC())
 	case 0x02: // LD (BC), A
 		c.write8(c.BC(), c.A)
+	case 0x05: // DEC B
+		c.applyOp(0, 0, dec)
 	case 0x06: // LD B, n
 		c.B = c.load8PC()
+	case 0x07: // RLCA
+		c.applyOp(7, 7, rlc)
 	case 0x0a: // LD A, (BC)
 		c.A = c.load8(c.BC())
 	case 0x0c: // INC C
-		c.C++
+		c.applyOp(1, 1, inc)
 	case 0x0e: // LD C, n
 		c.C = c.load8PC()
 	case 0x11: // LD DE, nn
 		c.setDE(c.load16PC())
 	case 0x12: // LD (DE), A
 		c.write8(c.DE(), c.A)
+	case 0x13: // INC DE
+		c.setDE(c.DE() + 1)
 	case 0x16: // LD D, n
 		c.D = c.load8PC()
+	case 0x17: // RLA
+		c.applyOp(7, 7, rl)
 	case 0x1a: // LD A, (DE)
 		c.A = c.load8(c.DE())
 	case 0x1e: // LD E, n
@@ -369,6 +449,8 @@ func (c *cpu) processOpcode() {
 		hl := c.HL()
 		c.write8(hl, c.A)
 		c.setHL(hl + 1)
+	case 0x23: // INC HL
+		c.setHL(c.HL() + 1)
 	case 0x26: // LD H, n
 		c.H = c.load8PC()
 	case 0x2a: // LD A, (HL+)
@@ -400,6 +482,8 @@ func (c *cpu) processOpcode() {
 		c.setBC(c.pop())
 	case 0xc5: // PUSH BC
 		c.push(c.BC())
+	case 0xc9: // RET
+		c.ret()
 	case 0xcb: // CB prefix
 		c.cb()
 	case 0xcd: // CALL nn
@@ -437,6 +521,10 @@ func (c *cpu) cb() {
 	opcode := c.load8PC()
 
 	switch {
+	case opcode < 0x40:
+		op := uint(opcode >> 3)
+		reg := int(opcode & 7)
+		c.applyOp(reg, reg, cbOps[op])
 	case 0x40 <= opcode && opcode < 0x80:
 		n := uint((opcode - 0x40) >> 3)
 		reg := int(opcode & 7)
