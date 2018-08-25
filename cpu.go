@@ -412,6 +412,10 @@ func (c *cpu) processOpcode() {
 		c.setBC(c.load16PC())
 	case 0x02: // LD (BC), A
 		c.write8(c.BC(), c.A)
+	case 0x03: // INC BC
+		c.setBC(c.BC() + 1)
+	case 0x04: // INC B
+		c.applyOp(0, 0, inc)
 	case 0x05: // DEC B
 		c.applyOp(0, 0, dec)
 	case 0x06: // LD B, n
@@ -420,20 +424,33 @@ func (c *cpu) processOpcode() {
 		c.applyOp(7, 7, rlc)
 	case 0x0a: // LD A, (BC)
 		c.A = c.load8(c.BC())
+	case 0x0b: // DEC BC
+		c.setBC(c.BC() - 1)
 	case 0x0c: // INC C
 		c.applyOp(1, 1, inc)
+	case 0x0d: // DEC C
+		c.applyOp(1, 1, dec)
 	case 0x0e: // LD C, n
 		c.C = c.load8PC()
+	case 0x0f: // RRCA
+		c.applyOp(7, 7, rrc)
 	case 0x11: // LD DE, nn
 		c.setDE(c.load16PC())
 	case 0x12: // LD (DE), A
 		c.write8(c.DE(), c.A)
 	case 0x13: // INC DE
 		c.setDE(c.DE() + 1)
+	case 0x14: // INC D
+		c.applyOp(2, 2, inc)
+	case 0x15: // DEC D
+		c.applyOp(2, 2, dec)
 	case 0x16: // LD D, n
 		c.D = c.load8PC()
 	case 0x17: // RLA
 		c.applyOp(7, 7, rl)
+	case 0x18: // JR, r8
+		address := c.PC + uint16(int8(c.load8PC()))
+		c.jump(address)
 	case 0x1a: // LD A, (DE)
 		c.A = c.load8(c.DE())
 	case 0x1e: // LD E, n
@@ -453,6 +470,11 @@ func (c *cpu) processOpcode() {
 		c.setHL(c.HL() + 1)
 	case 0x26: // LD H, n
 		c.H = c.load8PC()
+	case 0x28: // JR Z, r8
+		address := c.PC + uint16(int8(c.load8PC()))
+		if c.Z() {
+			c.jump(address)
+		}
 	case 0x2a: // LD A, (HL+)
 		hl := c.HL()
 		c.A = c.load8(hl)
@@ -472,10 +494,17 @@ func (c *cpu) processOpcode() {
 		c.setHL(hl - 1)
 	case 0x36: // LD (HL), n
 		c.write8(c.HL(), c.load8PC())
+	case 0x38: // JR C, r8
+		address := c.PC + uint16(int8(c.load8PC()))
+		if c.Cy() {
+			c.jump(address)
+		}
 	case 0x3a: // LD A, (HL-)
 		hl := c.HL()
 		c.A = c.load8(hl)
 		c.setHL(hl - 1)
+	case 0x3d: // DEC A
+		c.applyOp(7, 7, dec)
 	case 0x3e: // LD A, n
 		c.A = c.load8PC()
 	case 0xc1: // POP BC
@@ -501,6 +530,8 @@ func (c *cpu) processOpcode() {
 		c.write8(0xff00+uint16(c.C), c.A)
 	case 0xe5: // PUSH HL
 		c.push(c.HL())
+	case 0xea: // LD (nn) A
+		c.write8(c.load16PC(), c.A)
 	case 0xf0: // LDH A n
 		c.A = c.load8(0xff00 + uint16(c.load8PC()))
 	case 0xf1: // POP AF
@@ -509,6 +540,8 @@ func (c *cpu) processOpcode() {
 		c.A = c.load8(0xff00 + uint16(c.C))
 	case 0xf5: // PUSH AF
 		c.push(c.AF())
+	case 0xfe: // CP n
+		cp(c, int(c.load8PC()))
 	default:
 		panic("Unknown opcode 0x" + strconv.FormatInt(int64(opcode), 16))
 	}
