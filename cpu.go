@@ -162,161 +162,148 @@ func (c *cpu) ret() {
 	c.jump(c.pop())
 }
 
-// Helper that store a value in a register designed by its rank.
-// (from 0 to 7) B C D E H L HL A
-// Most of the time, the value will be a byte, but we need int for the generic case
-func (c *cpu) setReg(register int, value int) {
-	switch register {
-	case 0:
-		c.B = byte(value)
-	case 1:
-		c.C = byte(value)
-	case 2:
-		c.D = byte(value)
-	case 3:
-		c.E = byte(value)
-	case 4:
-		c.H = byte(value)
-	case 5:
-		c.L = byte(value)
-	case 6:
-		c.write8(c.HL(), byte(value))
-	case 7:
-		c.A = byte(value)
-	default:
-		panic("Wrong value")
-	}
-}
+type registerOperation func(c *cpu, value int) int
 
 // Helper that load a common value specified by its rank.
 // (from 0 to 7) B C D E H L (HL) A
-func (c *cpu) getReg(register int) int {
+func (c *cpu) getReg(register int) byte {
 	switch register {
 	case 0:
-		return int(c.B)
+		return c.B
 	case 1:
-		return int(c.C)
+		return c.C
 	case 2:
-		return int(c.D)
+		return c.D
 	case 3:
-		return int(c.E)
+		return c.E
 	case 4:
-		return int(c.H)
+		return c.H
 	case 5:
-		return int(c.L)
+		return c.L
 	case 6:
-		return int(c.load8(c.HL()))
+		return c.load8(c.HL())
 	case 7:
-		return int(c.A)
+		return c.A
 	default:
 		panic("Wrong value")
 	}
 }
 
-func (c *cpu) add(value int) {
+// Helper that apply an operation to a register and affect the result to a register
+// specified by its rank: (from 0 to 7) B C D E H L (HL) A.
+// Most of the time, the value will be a byte, but we need int for the generic case
+func (c *cpu) applyOp(destRank int, srcRank int, op registerOperation) {
+	result := byte(op(c, int(c.getReg(srcRank))))
+	switch destRank {
+	case 0:
+		c.B = result
+	case 1:
+		c.C = result
+	case 2:
+		c.D = result
+	case 3:
+		c.E = result
+	case 4:
+		c.H = result
+	case 5:
+		c.L = result
+	case 6:
+		c.write8(c.HL(), result)
+	case 7:
+		c.A = result
+	default:
+		panic("Wrong value")
+	}
+}
+
+func ld(c *cpu, value int) int {
+	return value
+}
+
+func add(c *cpu, value int) int {
 	a := int(c.A)
 	sum := a + value
 	carry := sum > 0xff
 	halfCarry := (a&0xf)+(value&0xf) > 0xf
-	result := byte(sum)
-	c.setFlags(result == 0, false, halfCarry, carry)
-	c.A = result
+	c.setFlags(sum == 0, false, halfCarry, carry)
+	return sum
 }
 
-func (c *cpu) addc(value int) {
+func addc(c *cpu, value int) int {
 	if c.Cy() {
 		value++
 	}
-	c.add(value)
+	return add(c, value)
 }
 
-func (c *cpu) sub(value int) {
-	c.A = c.cp(value)
-}
-
-func (c *cpu) sbc(value int) {
-	if c.Cy() {
-		value++
-	}
-	c.sub(value)
-}
-
-func (c *cpu) and(value int) {
-	c.A &= byte(value)
-	c.setFlags(c.A == 0, false, true, false)
-}
-
-func (c *cpu) or(value int) {
-	c.A |= byte(value)
-	c.setFlags(c.A == 0, false, false, false)
-}
-
-func (c *cpu) xor(value int) {
-	c.A ^= byte(value)
-	c.setFlags(c.A == 0, false, false, false)
-}
-
-func (c *cpu) cp(value int) byte {
+func sub(c *cpu, value int) int {
 	a := int(c.A)
 	diff := a - value
 	carry := diff < 0
-	result := byte(diff)
 	halfCarry := (a&0xf)-(value&0xf) < 0
-	c.setFlags(result == 0, true, halfCarry, carry)
+	c.setFlags(diff == 0, true, halfCarry, carry)
+	return diff
+}
+
+func sbc(c *cpu, value int) int {
+	if c.Cy() {
+		value++
+	}
+	return sub(c, value)
+}
+
+func and(c *cpu, value int) int {
+	result := int(c.A & byte(value))
+	c.setFlags(result == 0, false, true, false)
 	return result
 }
 
-func (c *cpu) bit(n uint, reg int) {
-	value := c.getReg(reg)
-	present := (value & (1 << n)) != 0
-	c.setFlags(present, false, true, c.Cy())
+func or(c *cpu, value int) int {
+	result := int(c.A | byte(value))
+	c.setFlags(result == 0, false, false, false)
+	return result
 }
 
-func (c *cpu) set(n uint, register int) {
-	switch register {
-	case 0:
-		c.B = c.B | (1 << n)
-	case 1:
-		c.C = c.C | (1 << n)
-	case 2:
-		c.D = c.D | (1 << n)
-	case 3:
-		c.E = c.E | (1 << n)
-	case 4:
-		c.H = c.H | (1 << n)
-	case 5:
-		c.L = c.L | (1 << n)
-	case 6:
-		c.write8(c.HL(), c.load8(c.HL())|(1<<n))
-	case 7:
-		c.A = c.A | (1 << n)
-	default:
-		panic("Wrong value")
+func xor(c *cpu, value int) int {
+	result := int(c.A ^ byte(value))
+	c.setFlags(c.A == 0, false, false, false)
+	return result
+}
+
+func cp(c *cpu, value int) int {
+	sub(c, value)
+	return value
+}
+
+func bit(n uint) registerOperation {
+	return func(c *cpu, value int) int {
+		present := (value & (1 << n)) != 0
+		c.setFlags(present, false, true, c.Cy())
+		return value
 	}
 }
 
-func (c *cpu) res(n uint, register int) {
-	switch register {
-	case 0:
-		c.B = c.B &^ (1 << n)
-	case 1:
-		c.C = c.C &^ (1 << n)
-	case 2:
-		c.D = c.D &^ (1 << n)
-	case 3:
-		c.E = c.E &^ (1 << n)
-	case 4:
-		c.H = c.H &^ (1 << n)
-	case 5:
-		c.L = c.L &^ (1 << n)
-	case 6:
-		c.write8(c.HL(), c.load8(c.HL())&^(1<<n))
-	case 7:
-		c.A = c.A &^ (1 << n)
-	default:
-		panic("Wrong value")
+func set(n uint) registerOperation {
+	return func(c *cpu, value int) int {
+		return value | (1 << n)
 	}
 }
+
+func res(n uint) registerOperation {
+	return func(c *cpu, value int) int {
+		return value &^ (1 << n)
+	}
+}
+
+func rlc(c *cpu, value int) int {
+	carry := byte(value) >> 7
+	result := byte(value) << 1
+	result += carry
+	c.setFlags(result == 0, false, false, carry == 1)
+	return int(result)
+}
+
+var arithmeticOps = []registerOperation{add, addc, sub, sbc, and, xor, or, cp}
 
 // processCode emulates the fetching and processing
 // of an instruction by the CPU
@@ -331,9 +318,9 @@ func (c *cpu) processOpcode() {
 
 	// Common LD operations
 	if 0x40 <= opcode && opcode < 0x80 {
-		src := int((opcode - 0x40) >> 3)
-		dst := int(opcode & 7)
-		c.setReg(src, dst)
+		dst := int((opcode - 0x40) >> 3)
+		src := int(opcode & 7)
+		c.applyOp(dst, src, ld)
 		return
 	}
 
@@ -341,24 +328,7 @@ func (c *cpu) processOpcode() {
 	if 0x80 <= opcode && opcode <= 0xc0 {
 		op := int((opcode - 0x80) >> 3)
 		src := int(opcode & 7)
-		switch op {
-		case 0:
-			c.add(c.getReg(src))
-		case 1:
-			c.addc(c.getReg(src))
-		case 2:
-			c.sub(c.getReg(src))
-		case 3:
-			c.sbc(c.getReg(src))
-		case 4:
-			c.and(c.getReg(src))
-		case 5:
-			c.xor(c.getReg(src))
-		case 6:
-			c.or(c.getReg(src))
-		case 7:
-			c.cp(c.getReg(src))
-		}
+		c.applyOp(7, src, arithmeticOps[op])
 		return
 	}
 
@@ -460,6 +430,8 @@ func (c *cpu) processOpcode() {
 	}
 }
 
+//var cbOps = []registerOperation{}
+
 // CB-prefixed opcodes
 func (c *cpu) cb() {
 	opcode := c.load8PC()
@@ -468,15 +440,15 @@ func (c *cpu) cb() {
 	case 0x40 <= opcode && opcode < 0x80:
 		n := uint((opcode - 0x40) >> 3)
 		reg := int(opcode & 7)
-		c.bit(n, reg)
+		c.applyOp(reg, reg, bit(n))
 	case 0x80 <= opcode && opcode < 0xc0:
 		n := uint((opcode - 0x80) >> 3)
 		reg := int(opcode & 7)
-		c.res(n, reg)
+		c.applyOp(reg, reg, res(n))
 	case 0xc0 <= opcode && opcode < 0xf0:
 		n := uint((opcode - 0xc0) >> 3)
 		reg := int(opcode & 7)
-		c.set(n, reg)
+		c.applyOp(reg, reg, set(n))
 	default:
 		panic("Unknown opcode 0xbc 0x" + strconv.FormatInt(int64(opcode), 16))
 	}
